@@ -55,7 +55,8 @@ def get_assembly_map(assembly):
     assembly_map = dict()
     for record in assembly:
         seq = record.seq
-        assembly_map[str(record.id)] = (seq, Seq(seq).reverse_complement())
+        assembly_map[str(record.id)] = (seq, seq.reverse_complement())
+
     return assembly_map
 
 
@@ -159,7 +160,7 @@ def get_final_assembly_for_DAGs(contig_map, path_to_output, ref_size, edges, nod
     for assembly in sorted_candidate_assemblies:
         print(list(assembly[0].keys()), assembly[2], assembly[1])
     for id in best_assembly.keys():
-        record = SeqRecord(Seq(best_assembly[id]), id=id, description=str(len(best_assembly[id])))
+        record = SeqRecord(best_assembly[id], id=id, description=str(len(best_assembly[id])))
         seqs.append(record)
     SeqIO.write(seqs, path_to_output + "/rambler.fasta", "fasta")
 

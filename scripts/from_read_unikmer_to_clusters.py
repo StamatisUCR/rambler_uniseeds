@@ -6,112 +6,111 @@ import numpy as np
 import sys
 import os
 import time
+from collections import defaultdict
 
 def create_directory(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
-def get_unikmer_map(unikmer_file):
-    unikmer_map = dict()
+def get_uniseed_map(uniseed_file):
+    uniseed_map = dict()
     counter = 0
-    while True:
-        line = unikmer_file.readline()
-        if not line:
-            break
-        unikmer_map[line.strip()] = counter
-        counter += 1
-    return unikmer_map
+    with open(uniseed_file, "r") as f:
+        for line in f:
+            parts = line.strip().split()
+            if not parts:
+                continue
+            seq = parts[0]
+            if seq not in uniseed_map:
+                uniseed_map[seq] = counter
+                counter += 1
+    return uniseed_map
+
+def write_uniseed_map(out_file, uniseed_map):
+    with open(out_file, "w") as f:
+        for seq, uid in uniseed_map.items():
+            f.write(f"{seq},{uid}\n")
 
 
-def write_unikmer_map(out_file, unikmer_map):
-    output = open(out_file, "w")
-    for unikmer in unikmer_map.keys():
-        output.write(str(unikmer) + "," + str(unikmer_map[unikmer]) + "\n")
-    output.close()
+def get_read_to_uniseed_and_uniseed_to_read_maps(uniseed_map, uniseed_file):
+    read_to_uniseed_map = defaultdict(list)
+    uniseed_to_read_map = defaultdict(list)
+    next_id = 0
+
+    with open(uniseed_file, 'r') as f:
+        for line in f:
+            parts = line.strip().split()
+            if not parts:
+                continue
+
+            seq = parts[0]
+            if seq not in uniseed_map:
+                continue  # Skip unrecognized entries just in case
+
+            uid = uniseed_map[seq]
+            for entry in parts[1:]:
+                entry = entry.strip("()")
+                read_id, pos = map(int, entry.split(','))
+                read_to_uniseed_map[read_id].append((uid, pos))
+                uniseed_to_read_map[uid].append((read_id, pos))
+
+    return dict(read_to_uniseed_map), dict(uniseed_to_read_map)
 
 
-def get_read_to_unikmer_and_unikmer_to_read_maps(unikmer_map, read_file, k):
-    read_to_unikmer_map = dict()
-    unikmer_to_read_map = dict()
-    unikmers = unikmer_map.keys()
-    for record in read_file:
-        read = record.seq
-        id = record.id
-        for i in range(len(read) - k + 1):
-            kmer = read[i:i + k]
-            str_kmer = str(kmer)
-            str_rev_kmer = str(kmer.reverse_complement())
-            if str_kmer in unikmers:
-                if id not in read_to_unikmer_map.keys():
-                    read_to_unikmer_map[id] = []
-                read_to_unikmer_map[id] += [(unikmer_map[str_kmer], i)]  # (unikmer_id, pos)
-                if unikmer_map[str_kmer] not in unikmer_to_read_map.keys():
-                    unikmer_to_read_map[unikmer_map[str_kmer]] = []
-                unikmer_to_read_map[unikmer_map[str_kmer]] += [(id, i)]  # (read_id, pos)
-            elif str_rev_kmer in unikmers:
-                if id not in read_to_unikmer_map.keys():
-                    read_to_unikmer_map[id] = []
-                read_to_unikmer_map[id] += [(unikmer_map[str_rev_kmer], i)]  # (unikmer_id, pos)
-                if unikmer_map[str_rev_kmer] not in unikmer_to_read_map.keys():
-                    unikmer_to_read_map[unikmer_map[str_rev_kmer]] = []
-                unikmer_to_read_map[unikmer_map[str_rev_kmer]] += [(id, i)]  # (read_id, pos)
-    return read_to_unikmer_map, unikmer_to_read_map
-
-
-def write_read_to_unikmer_and_unikmer_to_read_maps(out_r2u, out_u2r, read_to_unikmer_map, unikmer_to_read_map):
+def write_read_to_uniseed_and_uniseed_to_read_maps(out_r2u, out_u2r, read_to_uniseed_map, uniseed_to_read_map):
     out_r2u_file = open(out_r2u, "w")
     out_u2r_file = open(out_u2r, "w")
-    for read in read_to_unikmer_map.keys():
+    for read in read_to_uniseed_map.keys():
         out_r2u_file.write(str(read) + ">")
-        for tup in read_to_unikmer_map[read]:
+        for tup in read_to_uniseed_map[read]:
             out_r2u_file.write(str(tup) + ";")
         out_r2u_file.write("\n")
     out_r2u_file.close()
-    for unikmer in unikmer_to_read_map.keys():
+    for unikmer in uniseed_to_read_map.keys():
         out_u2r_file.write(str(unikmer) + ">")
-        for tup in unikmer_to_read_map[unikmer]:
+        for tup in uniseed_to_read_map[unikmer]:
             out_u2r_file.write(str(tup) + ";")
         out_u2r_file.write("\n")
     out_u2r_file.close()
 
 
-def get_read_to_unikmer_map(infile):
-    read_to_unikmer_map = dict()
-    read_to_unikmer_list = dict()
-    read_to_unikmerpos_map = dict()
+def get_read_to_uniseed_map(infile):
+    read_to_uniseed_map = dict()
+    read_to_uniseed_list = dict()
+    read_to_uniseedpos_map = dict()
     while True:
         line = infile.readline()
         if not line:
             break
         words = line.strip().split(">")
-        read = int(words[0].split("_")[1])
-        read_to_unikmer_map[read] = dict()
-        read_to_unikmer_list[read] = []
-        read_to_unikmerpos_map[read] = dict()
+        read = int(words[0])
+        read_to_uniseed_map[read] = dict()
+        read_to_uniseed_list[read] = []
+        read_to_uniseedpos_map[read] = dict()
         pairs = words[1].split(";")
         pos = 0
         for pair in pairs[:-1]:
             values = pair[1:-1].split(",")
-            read_to_unikmer_map[read][int(values[0])] = int(values[1])
-            read_to_unikmer_list[read] += [(int(values[0]), int(values[1]))]
-            read_to_unikmerpos_map[read][int(values[1])] = pos
+            read_to_uniseed_map[read][int(values[0])] = int(values[1])
+            read_to_uniseed_list[read] += [(int(values[0]), int(values[1]))]
+            read_to_uniseedpos_map[read][int(values[1])] = pos
             pos += 1
-    return read_to_unikmer_map, read_to_unikmer_list, read_to_unikmerpos_map
+    return read_to_uniseed_map, read_to_uniseed_list, read_to_uniseedpos_map
 
 
-def get_unikmer_to_read_map(infile):
-    unikmer_to_read_map = dict()
+def get_uniseed_to_read_map(infile):
+    uniseed_to_read_map = dict()
     while True:
         line = infile.readline()
         if not line:
             break
         words = line.strip().split(">")
-        unikmer_to_read_map[int(words[0])] = dict()
+        uniseed_to_read_map[int(words[0])] = dict()
         pairs = words[1].split(";")
         for pair in pairs[:-1]:
             values = pair[1:-1].split(",")
-            unikmer_to_read_map[int(words[0])][int(values[0].split("_")[1][:-1])] = int(values[1])
-    return unikmer_to_read_map
+            uniseed_to_read_map[int(words[0])][int(values[0])] = int(values[1])
+    return uniseed_to_read_map
 
 
 # newer version of get_pairwise_profiles method
@@ -308,25 +307,28 @@ def write_read_clusters_to_fasta(cluster_file, read_file, path_to_output):
     for i in range(no_of_clusters):
         seqs = []
         for j in range(len(clusters[i])):
-            record = SeqRecord(Seq(read_dict[clusters[i][j]]), id=str(clusters[i][j]),
-                               description="cluster_"+str(i)+"_read_"+str(clusters[i][j]))
+            record = SeqRecord(
+                read_dict[clusters[i][j]],
+                id=str(clusters[i][j]),
+                description="cluster_" + str(i) + "_read_" + str(clusters[i][j])
+            )
             seqs.append(record)
         SeqIO.write(seqs, path_to_output + str(i) + ".fasta", "fasta")
 
 
-def get_clusters_from_unikmers_and_reads(unikmer_file, read_file1, read_file2, k, out_dir, tolerance, threshold):
-    unikmer_map = get_unikmer_map(unikmer_file)
-    out_unikmer_map = out_dir+ "/intermediates/unikmer_map.txt"
-    write_unikmer_map(out_unikmer_map, unikmer_map)
-    r2u, u2r = get_read_to_unikmer_and_unikmer_to_read_maps(unikmer_map, read_file1, k)
+def get_clusters_from_unikmers_and_reads(uniseed_file, read_file, out_dir, tolerance, threshold):
+    uniseed_map = get_uniseed_map(uniseed_file)
+    out_uniseed_map = out_dir+ "/intermediates/unikmer_map.txt"
+    write_uniseed_map(out_uniseed_map, uniseed_map)
+    r2u, u2r = get_read_to_uniseed_and_uniseed_to_read_maps(uniseed_map, uniseed_file)
     out_r2u = out_dir+ "/intermediates/read_to_unikmer_map.txt"
     out_u2r = out_dir+ "/intermediates/unikmer_to_read_map.txt"
-    write_read_to_unikmer_and_unikmer_to_read_maps(out_r2u, out_u2r, r2u, u2r)
+    write_read_to_uniseed_and_uniseed_to_read_maps(out_r2u, out_u2r, r2u, u2r)
     print("status: --- unikmer barcoding done ---")
     in_r2u = open(out_r2u, "r")
     in_u2r = open(out_u2r, "r")
-    r2u_map, r2u_list, r2up_map = get_read_to_unikmer_map(in_r2u)
-    u2r_map = get_unikmer_to_read_map(in_u2r)
+    r2u_map, r2u_list, r2up_map = get_read_to_uniseed_map(in_r2u)
+    u2r_map = get_uniseed_to_read_map(in_u2r)
     pw_profiles = get_pairwise_profiles(u2r_map, r2u_map, r2u_list, r2up_map, tolerance)
     out_pw_profiles = out_dir+ "/intermediates/pairwise_profiles.txt"
     write_pairwise_profiles(pw_profiles, out_pw_profiles)
@@ -344,7 +346,7 @@ def get_clusters_from_unikmers_and_reads(unikmer_file, read_file1, read_file2, k
     outfile.close()
     cluster_file = open(out_path, "r")
     out_clusters = out_dir + "/clusters/"
-    write_read_clusters_to_fasta(cluster_file, read_file2, out_clusters)
+    write_read_clusters_to_fasta(cluster_file, read_file, out_clusters)
     print("status: --- clustering done ---")
 
 
@@ -353,17 +355,15 @@ def rambler_run():
     print("----------------- RAmbler initializing -----------------")
     print("read file:", sys.argv[1])
     print("unikmer file:", sys.argv[2])
-    print("unikmer size:", sys.argv[5])
     print("estimated reference size:", sys.argv[4])
-    print("tolerance:", sys.argv[6])
-    print("threshold:", sys.argv[7])
+    print("tolerance:", sys.argv[5])
+    print("threshold:", sys.argv[6])
     print("output directory:", sys.argv[3])
     create_directory(sys.argv[3]+"/assembly/hifiasm")
     start_time = time.time()
-    unikmer_file = open(sys.argv[2], "r")
-    read_file1 = SeqIO.parse(sys.argv[3]+"/intermediates/reads.fasta", "fasta")
-    read_file2 = SeqIO.parse(sys.argv[3]+"/intermediates/reads.fasta", "fasta")
-    get_clusters_from_unikmers_and_reads(unikmer_file, read_file1, read_file2, int(sys.argv[5]), sys.argv[3], int(sys.argv[6]), int(sys.argv[7]))
+    uniseed_file = sys.argv[2]
+    read_file = SeqIO.parse(sys.argv[3]+"/intermediates/reads.fasta", "fasta")
+    get_clusters_from_unikmers_and_reads(uniseed_file, read_file, sys.argv[3], int(sys.argv[5]), int(sys.argv[6]))
     end_time = time.time()
     print("Runtime:", end_time - start_time, "seconds")
 

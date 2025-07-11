@@ -55,7 +55,7 @@ def get_assembly_map(assembly):
     assembly_map = dict()
     for record in assembly:
         seq = record.seq
-        assembly_map[str(record.id)] = (seq, Seq(seq).reverse_complement())
+        assembly_map[str(record.id)] = (seq, Seq(str(seq)).reverse_complement())
     return assembly_map
 
 
@@ -70,7 +70,7 @@ def get_final_assebmly_without_overlap_graph(contig_map, path_to_output, ref_siz
             current_dist -= len(current_contig)
     seqs = []
     for id in current_assembly:
-        record = SeqRecord(Seq(current_assembly[id]), id=id, description=str(len(current_assembly[id])))
+        record = SeqRecord(Seq(str(current_assembly[id])), id=id, description=str(len(current_assembly[id])))
         seqs.append(record)
     SeqIO.write(seqs, path_to_output + "/rambler_merged.fasta", "fasta")
 

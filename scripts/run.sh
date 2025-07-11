@@ -10,9 +10,8 @@
 
 
 # Default values
-k_len=21
 tolerance=15
-threshold=15
+threshold=1
 
 # Parse command-line options using getopts
 while getopts "r:u:o:s:k:l:h:" opt; do
@@ -29,9 +28,6 @@ while getopts "r:u:o:s:k:l:h:" opt; do
 	s)
 	  REF_SIZE="$OPTARG"
 	  ;;
-	k)
-	  k_len="$OPTARG"
-	  ;;
 	l)
 	  tolerance="$OPTARG"
 	  ;;
@@ -39,7 +35,7 @@ while getopts "r:u:o:s:k:l:h:" opt; do
 	  threshold="$OPTARG"
 	  ;;
     \?)
-      echo "Usage: $0 -r read_file -u unikmer_file -o output_directory -s assembly_length [-k kmer_length] [-l tolerance] [-h threshold]"
+      echo "Usage: $0 -r read_file -u unikmer_file -o output_directory -s assembly_length [-l tolerance] [-h threshold]"
       exit 1
       ;;
   esac
@@ -79,7 +75,7 @@ mkdir -p $ASSEMBLY
 # command for converting the read ids to the expected format
 awk '/^>/{print ">S1_" ++i; next}{print}' < $READ_FILE > $INTERMEDIATES/reads.fasta
 
-python3 ./from_read_unikmer_to_clusters.py $READ_FILE $KMER_FILE $OUT_DIR $REF_SIZE $k_len $tolerance $threshold
+python3 ./from_read_unikmer_to_clusters.py $READ_FILE $KMER_FILE $OUT_DIR $REF_SIZE $tolerance $threshold
 
 rm $INTERMEDIATES/reads.fasta
 
